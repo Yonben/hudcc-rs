@@ -150,23 +150,23 @@ pub fn get_context_percent(val: &JsonValue) -> u32 {
 
     // Fallback: compute from token counts / context_window_size.
     let input = val
-        .get("input_tokens")
+        .get_path(&["context_window", "current_usage", "input_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0);
     let cache_create = val
-        .get("cache_creation_input_tokens")
+        .get_path(&["context_window", "current_usage", "cache_creation_input_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0);
     let cache_read = val
-        .get("cache_read_input_tokens")
+        .get_path(&["context_window", "current_usage", "cache_read_input_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0);
     let output = val
-        .get("output_tokens")
+        .get_path(&["context_window", "total_output_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0);
     let window = val
-        .get("context_window_size")
+        .get_path(&["context_window", "context_window_size"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0);
 
@@ -198,57 +198,57 @@ pub fn extract(val: &JsonValue) -> StdinData {
         .map(|s| s.to_string());
 
     let total_cost_usd = val
-        .get("total_cost_usd")
+        .get_path(&["cost", "total_cost_usd"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0);
 
     let total_duration_ms = val
-        .get("total_duration_ms")
+        .get_path(&["cost", "total_duration_ms"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
     let total_lines_added = val
-        .get("total_lines_added")
+        .get_path(&["cost", "total_lines_added"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
     let total_lines_removed = val
-        .get("total_lines_removed")
+        .get_path(&["cost", "total_lines_removed"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
     let total_api_duration_ms = val
-        .get("total_api_duration_ms")
+        .get_path(&["cost", "total_api_duration_ms"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
     let current_dir = val
-        .get("current_dir")
+        .get_path(&["workspace", "current_dir"])
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
     let agent_name = val
-        .get("agent_name")
+        .get_path(&["agent", "name"])
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
 
     let input_tokens = val
-        .get("input_tokens")
+        .get_path(&["context_window", "current_usage", "input_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
     let cache_creation_tokens = val
-        .get("cache_creation_input_tokens")
+        .get_path(&["context_window", "current_usage", "cache_creation_input_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
     let cache_read_tokens = val
-        .get("cache_read_input_tokens")
+        .get_path(&["context_window", "current_usage", "cache_read_input_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
     let total_output_tokens = val
-        .get("output_tokens")
+        .get_path(&["context_window", "total_output_tokens"])
         .and_then(|v| v.as_f64())
         .unwrap_or(0.0) as u64;
 
@@ -316,11 +316,15 @@ mod tests {
     #[test]
     fn test_extract_context_percent_fallback() {
         let json = r#"{
-            "input_tokens": 1000,
-            "cache_creation_input_tokens": 500,
-            "cache_read_input_tokens": 200,
-            "output_tokens": 300,
-            "context_window_size": 10000
+            "context_window": {
+                "context_window_size": 10000,
+                "current_usage": {
+                    "input_tokens": 1000,
+                    "cache_creation_input_tokens": 500,
+                    "cache_read_input_tokens": 200
+                },
+                "total_output_tokens": 300
+            }
         }"#;
         let val = parse(json).unwrap();
         // (1000 + 500 + 200 + 300) / 10000 * 100 = 20%
@@ -335,21 +339,30 @@ mod tests {
                 "display_name": "Claude Sonnet 4.5"
             },
             "context_window": {
-                "used_percentage": 55
+                "used_percentage": 55,
+                "context_window_size": 200000,
+                "current_usage": {
+                    "input_tokens": 800,
+                    "cache_creation_input_tokens": 100,
+                    "cache_read_input_tokens": 50
+                },
+                "total_output_tokens": 200
             },
             "version": "1.2.3",
             "transcript_path": "/tmp/transcript.jsonl",
-            "total_cost_usd": 0.0123,
-            "total_duration_ms": 4500,
-            "total_lines_added": 120,
-            "total_lines_removed": 30,
-            "total_api_duration_ms": 3200,
-            "current_dir": "/home/user/project",
-            "agent_name": "my-agent",
-            "input_tokens": 800,
-            "cache_creation_input_tokens": 100,
-            "cache_read_input_tokens": 50,
-            "output_tokens": 200
+            "cost": {
+                "total_cost_usd": 0.0123,
+                "total_duration_ms": 4500,
+                "total_lines_added": 120,
+                "total_lines_removed": 30,
+                "total_api_duration_ms": 3200
+            },
+            "workspace": {
+                "current_dir": "/home/user/project"
+            },
+            "agent": {
+                "name": "my-agent"
+            }
         }"#;
         let val = parse(json).unwrap();
         let data = extract(&val);

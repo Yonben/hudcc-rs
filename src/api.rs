@@ -109,7 +109,7 @@ pub fn get_usage(debug_enabled: bool) -> Option<UsageData> {
     let url = "https://api.anthropic.com/api/oauth/usage";
     let headers = vec![
         format!("Authorization: Bearer {}", creds.access_token),
-        "Content-Type: application/json".to_string(),
+        "anthropic-beta: oauth-2025-04-20".to_string(),
     ];
 
     let (status, body) = curl_get(url, &headers, API_TIMEOUT)?;
@@ -205,7 +205,7 @@ fn read_credentials_file(path: &str, debug_enabled: bool) -> Option<Credentials>
 #[cfg(target_os = "macos")]
 fn read_keychain_credentials(debug_enabled: bool) -> Option<Credentials> {
     let output = Command::new("security")
-        .args(&["find-generic-password", "-s", "claude.ai", "-w"])
+        .args(&["find-generic-password", "-s", "Claude Code-credentials", "-w"])
         .output()
         .ok()?;
 
@@ -324,18 +324,19 @@ fn refresh_access_token(refresh_token: &str, debug_enabled: bool) -> Option<Cred
     let new_refresh_token = parsed
         .get("refresh_token")
         .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
+        .map(|s| s.to_string())
+        .or_else(|| Some(refresh_token.to_string()));
 
-    // Compute expires_at: prefer absolute expires_at, else compute from expires_in
+    // Compute expires_at: prefer expires_in (seconds), else use expires_at directly
     let expires_at = parsed
-        .get("expires_at")
+        .get("expires_in")
         .and_then(|v| v.as_f64())
-        .map(|f| f as u64)
+        .map(|secs| now_ms() + (secs as u64) * 1000)
         .or_else(|| {
             parsed
-                .get("expires_in")
+                .get("expires_at")
                 .and_then(|v| v.as_f64())
-                .map(|secs| now_ms() + (secs as u64) * 1000)
+                .map(|f| f as u64)
         });
 
     debug_log_api(debug_enabled, "token refreshed successfully");
@@ -419,6 +420,7 @@ pub fn build_usage_data(resp: &JsonValue) -> UsageData {
         .get("five_hour")
         .and_then(|v| v.get("utilization"))
         .and_then(|v| v.as_f64())
+        .map(|v| (v * 100.0).clamp(0.0, 100.0))
         .unwrap_or(0.0);
 
     let five_hour_resets = resp
@@ -431,6 +433,7 @@ pub fn build_usage_data(resp: &JsonValue) -> UsageData {
         .get("seven_day")
         .and_then(|v| v.get("utilization"))
         .and_then(|v| v.as_f64())
+        .map(|v| (v * 100.0).clamp(0.0, 100.0))
         .unwrap_or(0.0);
 
     let seven_day_resets = resp
@@ -592,8 +595,8 @@ mod tests {
         let parsed = parse(resp_json).expect("valid json");
         let usage = build_usage_data(&parsed);
 
-        assert!((usage.five_hour - 0.5).abs() < 1e-9);
-        assert!((usage.seven_day - 0.25).abs() < 1e-9);
+        assert!((usage.five_hour - 50.0).abs() < 1e-9);
+        assert!((usage.seven_day - 25.0).abs() < 1e-9);
         assert!(usage.five_hour_resets.is_some());
         assert!(usage.seven_day_resets.is_some());
         // 2025-01-01T00:00:00Z = 1735689600000 ms

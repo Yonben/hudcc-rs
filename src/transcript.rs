@@ -67,7 +67,7 @@ struct AgentEntry {
 }
 
 /// Mutable state threaded through parse_line calls.
-struct ParseState {
+pub(crate) struct ParseState {
     session_start: Option<u64>,
     /// Agents keyed by tool_use_id.
     agent_map: Vec<AgentEntry>,
@@ -215,7 +215,7 @@ fn build_result(mut state: ParseState) -> TranscriptData {
 // ---------------------------------------------------------------------------
 
 /// Parse one JSONL line and update state.
-pub fn process_line(line: &str, state: &mut ParseState) {
+pub(crate) fn process_line(line: &str, state: &mut ParseState) {
     let line = line.trim();
     if line.is_empty() {
         return;

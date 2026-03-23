@@ -87,7 +87,7 @@ pub fn render(
 
     // "Context"
     if config.columns.contains(&"Context".to_string()) {
-        let label = "Context:".to_string();
+        let label = format!("{}Context:{}", SLATE800_BOLD, RESET);
         let pct = stdin.context_pct as f64;
         let color = color_for_percent(pct, 70.0, 85.0);
         // Spec: color + "{pct}% " + RESET + SLATE600 + "Used" + RESET
@@ -148,8 +148,8 @@ pub fn render(
             format!("{}+0/-0{}", SLATE600, RESET)
         } else {
             format!(
-                "{}+{}{}{}{}{}{}{}",
-                GREEN, added, RESET, SLATE600, "/", RESET, RED, format!("-{}", removed)
+                "{}+{}{}/{}{}{}",
+                GREEN, added, RESET, RED, format!("-{}", removed), RESET
             )
         };
         columns.push(Column { label, value });
@@ -306,7 +306,8 @@ pub fn render(
                 let pairs: Vec<String> = columns.iter()
                     .map(|c| format!("{} {}", c.label, c.value))
                     .collect();
-                pairs.join(" │ ")
+                let sep_h = format!(" {}│{} ", SLATE800, RESET);
+                pairs.join(&sep_h)
             }
         }
     };
