@@ -44,9 +44,16 @@ fn run() {
         .map(|v| v == "1")
         .unwrap_or(false);
 
+    let no_network = std::env::var("HUD_NO_NETWORK")
+        .ok()
+        .map(|v| v == "1")
+        .unwrap_or(false);
+
     let transcript_path = stdin_data.transcript_path.clone();
 
-    let usage_handle = thread::spawn(move || api::get_usage(debug_enabled));
+    let usage_handle = thread::spawn(move || {
+        if no_network { None } else { api::get_usage(debug_enabled) }
+    });
 
     let transcript_handle = thread::spawn(move || match transcript_path {
         Some(ref p) => transcript::parse_transcript(p),
@@ -57,7 +64,9 @@ fn run() {
         },
     });
 
-    let version_handle = thread::spawn(|| version::get_latest_version());
+    let version_handle = thread::spawn(move || {
+        if no_network { None } else { version::get_latest_version() }
+    });
 
     let usage = usage_handle.join().unwrap_or(None);
     let transcript_data =
