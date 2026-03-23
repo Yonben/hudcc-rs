@@ -1,5 +1,6 @@
 mod ansi;
 mod cache;
+mod config;
 mod json;
 mod time;
 
