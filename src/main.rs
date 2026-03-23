@@ -1,4 +1,5 @@
 mod ansi;
+mod api;
 mod cache;
 mod config;
 mod json;
