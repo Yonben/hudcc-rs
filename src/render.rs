@@ -280,21 +280,21 @@ pub fn render(
     } else {
         match config.layout {
             Layout::Vertical => {
-                // Compute max widths for alignment
-                let max_label = columns.iter()
-                    .map(|c| strip_ansi(&c.label).chars().count())
-                    .max()
-                    .unwrap_or(0);
-                let max_value = columns.iter()
-                    .map(|c| strip_ansi(&c.value).chars().count())
-                    .max()
-                    .unwrap_or(0);
-
-                let row1: Vec<String> = columns.iter()
-                    .map(|c| pad_ansi(&c.label, max_label))
+                // Each column's width = max(label_width, value_width)
+                // so separators align between row 1 and row 2.
+                let col_widths: Vec<usize> = columns.iter()
+                    .map(|c| {
+                        let lw = strip_ansi(&c.label).chars().count();
+                        let vw = strip_ansi(&c.value).chars().count();
+                        lw.max(vw)
+                    })
                     .collect();
-                let row2: Vec<String> = columns.iter()
-                    .map(|c| pad_ansi(&c.value, max_value))
+
+                let row1: Vec<String> = columns.iter().zip(&col_widths)
+                    .map(|(c, &w)| pad_ansi(&c.label, w))
+                    .collect();
+                let row2: Vec<String> = columns.iter().zip(&col_widths)
+                    .map(|(c, &w)| pad_ansi(&c.value, w))
                     .collect();
 
                 let sep_colored = format!(" {}│{} ", SLATE800, RESET);
