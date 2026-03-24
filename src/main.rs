@@ -1,14 +1,4 @@
-mod json;
-mod ansi;
-mod time;
-mod cache;
-mod config;
-mod stdin;
-mod api;
-mod version;
-mod transcript;
-mod render;
-
+use hud_rs::*;
 use std::thread;
 
 fn main() {
