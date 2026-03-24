@@ -1,4 +1,4 @@
-use hud_rs::*;
+use hudcc_rs::*;
 use std::thread;
 
 fn main() {

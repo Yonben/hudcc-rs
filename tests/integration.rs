@@ -1,10 +1,10 @@
-use hud_rs::ansi::strip_ansi;
-use hud_rs::api::UsageData;
-use hud_rs::config::{Config, Layout};
-use hud_rs::render::render;
-use hud_rs::stdin::StdinData;
-use hud_rs::transcript::TranscriptData;
-use hud_rs::json::JsonValue;
+use hudcc_rs::ansi::strip_ansi;
+use hudcc_rs::api::UsageData;
+use hudcc_rs::config::{Config, Layout};
+use hudcc_rs::render::render;
+use hudcc_rs::stdin::StdinData;
+use hudcc_rs::transcript::TranscriptData;
+use hudcc_rs::json::JsonValue;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -146,7 +146,7 @@ fn test_vertical_layout_has_two_rows() {
 
     let non_empty_lines: Vec<&str> = output
         .lines()
-        .filter(|l| !l.trim().is_empty())
+        .filter(|l: &&str| !l.trim().is_empty())
         .collect();
 
     assert!(
