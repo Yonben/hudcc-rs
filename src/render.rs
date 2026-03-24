@@ -24,9 +24,16 @@ struct Column {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Unicode-safe truncation: takes up to `max` chars.
+/// Unicode-safe truncation: takes up to `max` chars, appending ellipsis if truncated.
 fn truncate(s: &str, max: usize) -> String {
-    s.chars().take(max).collect()
+    let count = s.chars().count();
+    if count <= max {
+        s.to_string()
+    } else {
+        let mut t: String = s.chars().take(max.saturating_sub(1)).collect();
+        t.push('…');
+        t
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -401,8 +408,11 @@ mod tests {
     #[test]
     fn test_truncate() {
         assert_eq!(truncate("hello", 10), "hello");
-        assert_eq!(truncate("hello world", 5), "hello");
-        assert_eq!(truncate("héllo wörld", 5), "héllo");
+        assert_eq!(truncate("hello", 5), "hello");
+        assert_eq!(truncate("hello world", 5), "hell…");
+        assert_eq!(truncate("héllo", 5), "héllo");
+        assert_eq!(truncate("héllo wörld", 5), "héll…");
+        assert_eq!(truncate("hello", 1), "…");
     }
 
     #[test]
