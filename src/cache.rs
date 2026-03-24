@@ -13,6 +13,7 @@ pub const CACHE_TTL_MS: u64 = 60_000;
 pub const CACHE_TTL_FAILURE_MS: u64 = 15_000;
 pub const CACHE_TTL_RATELIMIT_MS: u64 = 120_000;
 pub const VERSION_CACHE_TTL_MS: u64 = 3_600_000;
+pub const UPDATE_CACHE_TTL_MS: u64 = 86_400_000; // 24 hours
 
 // ---------------------------------------------------------------------------
 // CacheEntry
