@@ -157,14 +157,18 @@ pub fn render(
         ("Cost", Box::new(|| {
             let label = "Cost:".to_string();
             let cost = stdin.total_cost_usd;
-            let color = if cost >= 1.0 {
-                RED
-            } else if cost >= 0.25 {
-                YELLOW
+            let value = if cost > 0.0 && cost < 0.01 {
+                format!("{}<$0.01{}", GREEN, RESET)
             } else {
-                GREEN
+                let color = if cost >= 1.0 {
+                    RED
+                } else if cost >= 0.25 {
+                    YELLOW
+                } else {
+                    GREEN
+                };
+                format!("{}${:.2}{}", color, cost, RESET)
             };
-            let value = format!("{}${:.2}{}", color, cost, RESET);
             Column { label, value }
         })),
         ("Tokens", Box::new(|| {
@@ -595,5 +599,39 @@ mod tests {
         let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
         assert!(plain.contains("and 3 more"), "missing overflow indicator, got:\n{}", plain);
         assert!(!plain.contains("Agent task 4"), "agent 4 should be hidden");
+    }
+
+    #[test]
+    fn test_sub_penny_cost() {
+        let transcript = TranscriptData {
+            session_start: None,
+            agents: vec![],
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 30,
+            model_id: "Opus 4.6".to_string(),
+            version: None,
+            transcript_path: None,
+            total_cost_usd: 0.005,
+            total_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            total_api_duration_ms: 0,
+            current_dir: None,
+            agent_name: None,
+            input_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            total_output_tokens: 0,
+        };
+        let config = Config {
+            columns: vec!["Cost".into()],
+            layout: Layout::Horizontal,
+        };
+        let out = render(None, &transcript, &stdin_data, None, &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+        assert!(plain.contains("<$0.01"), "sub-penny cost should show <$0.01, got: {}", plain);
     }
 }
