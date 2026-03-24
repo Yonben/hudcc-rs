@@ -39,10 +39,7 @@ fn run() {
 
     let config = config::read_config();
 
-    let debug_enabled = std::env::var("DEBUG_USAGE")
-        .ok()
-        .map(|v| v == "1")
-        .unwrap_or(false);
+    let debug_enabled = std::env::var("HUD_DEBUG").as_deref() == Ok("1");
 
     let no_network = std::env::var("HUD_NO_NETWORK")
         .ok()
@@ -68,16 +65,58 @@ fn run() {
         if no_network { None } else { version::get_latest_version() }
     });
 
-    let usage = usage_handle.join().unwrap_or(None);
-    let transcript_data =
-        transcript_handle
-            .join()
-            .unwrap_or_else(|_| transcript::TranscriptData {
+    let usage = match usage_handle.join() {
+        Ok(v) => v,
+        Err(e) => {
+            if debug_enabled {
+                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = e.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                eprintln!("[hud] usage thread panicked: {}", msg);
+            }
+            None
+        }
+    };
+    let transcript_data = match transcript_handle.join() {
+        Ok(v) => v,
+        Err(e) => {
+            if debug_enabled {
+                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = e.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                eprintln!("[hud] transcript thread panicked: {}", msg);
+            }
+            transcript::TranscriptData {
                 session_start: None,
                 agents: vec![],
                 todos: vec![],
-            });
-    let latest_version = version_handle.join().unwrap_or(None);
+            }
+        }
+    };
+    let latest_version = match version_handle.join() {
+        Ok(v) => v,
+        Err(e) => {
+            if debug_enabled {
+                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = e.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                eprintln!("[hud] version thread panicked: {}", msg);
+            }
+            None
+        }
+    };
 
     let output = render::render(
         usage.as_ref(),
