@@ -43,232 +43,207 @@ pub fn render(
     // -----------------------------------------------------------------------
     // Build columns
     // -----------------------------------------------------------------------
-    let mut columns: Vec<Column> = Vec::new();
-
-    // "5h Usage"
-    if config.columns.contains(&"5h Usage".to_string()) {
-        let label = format!("{}5h Usage:{}", SLATE800_BOLD, RESET);
-        let value = if let Some(u) = usage {
-            let pct = u.five_hour;
-            let color = color_for_percent(pct, 60.0, 80.0);
-            let mut v = format!("{}{:.0}%{}", color, pct, RESET);
-            if let Some(resets) = u.five_hour_resets {
-                let rt = format_reset_time(resets);
-                if !rt.is_empty() {
-                    v.push_str(&format!(" {}{}{}", SLATE600, rt, RESET));
-                }
-            }
-            v
-        } else {
-            format!("{}N/A{}", SLATE600, RESET)
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "7d Usage"
-    if config.columns.contains(&"7d Usage".to_string()) {
-        let label = format!("{}7d Usage:{}", SLATE800_BOLD, RESET);
-        let value = if let Some(u) = usage {
-            let pct = u.seven_day;
-            let color = color_for_percent(pct, 60.0, 80.0);
-            let mut v = format!("{}{:.0}%{}", color, pct, RESET);
-            if let Some(resets) = u.seven_day_resets {
-                let rt = format_reset_time(resets);
-                if !rt.is_empty() {
-                    v.push_str(&format!(" {}{}{}", SLATE600, rt, RESET));
-                }
-            }
-            v
-        } else {
-            format!("{}N/A{}", SLATE600, RESET)
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "Context"
-    if config.columns.contains(&"Context".to_string()) {
-        let label = format!("{}Context:{}", SLATE800_BOLD, RESET);
-        let pct = stdin.context_pct as f64;
-        let color = color_for_percent(pct, 70.0, 85.0);
-        // Spec: color + "{pct}% " + RESET + SLATE600 + "Used" + RESET
-        let value = format!(
-            "{}{:.0}% {}{}Used{}",
-            color, pct, RESET, SLATE600, RESET
-        );
-        columns.push(Column { label, value });
-    }
-
-    // "Model"
-    if config.columns.contains(&"Model".to_string()) {
-        let label = "Model:".to_string();
-        let value = format!("{}{}{}", SLATE600, stdin.model_id, RESET);
-        columns.push(Column { label, value });
-    }
-
-    // "Version"
-    if config.columns.contains(&"Version".to_string()) {
-        let label = "Version:".to_string();
-        let value = if let Some(ref ver) = stdin.version {
-            // Green dot if current==latest or no latest; yellow dot if update available
-            let dot = match latest_version {
-                None => format!("{}●{} ", GREEN, RESET),
-                Some(lv) => {
-                    if ver == lv {
-                        format!("{}●{} ", GREEN, RESET)
-                    } else {
-                        format!("{}●{} ", YELLOW, RESET)
+    // Declarative column registry: each entry is (config_key, builder closure).
+    // Display order follows this vec; config.columns controls which appear.
+    let defs: Vec<(&str, Box<dyn Fn() -> Column + '_>)> = vec![
+        ("5h Usage", Box::new(|| {
+            let label = format!("{}5h Usage:{}", SLATE800_BOLD, RESET);
+            let value = if let Some(u) = usage {
+                let pct = u.five_hour;
+                let color = color_for_percent(pct, 60.0, 80.0);
+                let mut v = format!("{}{:.0}%{}", color, pct, RESET);
+                if let Some(resets) = u.five_hour_resets {
+                    let rt = format_reset_time(resets);
+                    if !rt.is_empty() {
+                        v.push_str(&format!(" {}{}{}", SLATE600, rt, RESET));
                     }
                 }
+                v
+            } else {
+                format!("{}N/A{}", SLATE600, RESET)
             };
-            format!("{}{}v{}{}", dot, SLATE600, ver, RESET)
-        } else {
-            format!("{}N/A{}", SLATE600, RESET)
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "Session"
-    if config.columns.contains(&"Session".to_string()) {
-        let label = "Session:".to_string();
-        let value = if stdin.total_duration_ms > 0 {
-            format!("{}{}{}", SLATE600, format_duration(stdin.total_duration_ms), RESET)
-        } else {
-            format!("{}N/A{}", SLATE600, RESET)
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "Changes"
-    if config.columns.contains(&"Changes".to_string()) {
-        let label = "Changes:".to_string();
-        let added = stdin.total_lines_added;
-        let removed = stdin.total_lines_removed;
-        // Spec: GREEN + "+{added}" + RESET + SLATE600 + "/" + RESET + RED + "-{removed}"
-        let value = if added == 0 && removed == 0 {
-            format!("{}+0/-0{}", SLATE600, RESET)
-        } else {
-            format!(
-                "{}+{}{}/{}{}{}",
-                GREEN, added, RESET, RED, format!("-{}", removed), RESET
-            )
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "Directory"
-    if config.columns.contains(&"Directory".to_string()) {
-        let label = "Directory:".to_string();
-        let value = match &stdin.current_dir {
-            Some(d) => format!("{}{}{}", SLATE600, d, RESET),
-            None => format!("{}N/A{}", SLATE600, RESET),
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "Cost"
-    if config.columns.contains(&"Cost".to_string()) {
-        let label = "Cost:".to_string();
-        let cost = stdin.total_cost_usd;
-        let color = if cost >= 1.0 {
-            RED
-        } else if cost >= 0.25 {
-            YELLOW
-        } else {
-            GREEN
-        };
-        // Spec says: "${:.2}" format
-        let value = format!("{}${:.2}{}", color, cost, RESET);
-        columns.push(Column { label, value });
-    }
-
-    // "Tokens"
-    if config.columns.contains(&"Tokens".to_string()) {
-        let label = "Tokens:".to_string();
-        let total = stdin.input_tokens + stdin.cache_creation_tokens + stdin.cache_read_tokens;
-        let value = format!("{}{}{}", SLATE600, format_tokens(total), RESET);
-        columns.push(Column { label, value });
-    }
-
-    // "Output Tokens"
-    if config.columns.contains(&"Output Tokens".to_string()) {
-        let label = "Out Tokens:".to_string();
-        let value = format!("{}{}{}", SLATE600, format_tokens(stdin.total_output_tokens), RESET);
-        columns.push(Column { label, value });
-    }
-
-    // "Cache"
-    if config.columns.contains(&"Cache".to_string()) {
-        let label = "Cache:".to_string();
-        let total_in = stdin.input_tokens + stdin.cache_creation_tokens + stdin.cache_read_tokens;
-        let cache_pct = if total_in > 0 {
-            (stdin.cache_read_tokens as f64 / total_in as f64) * 100.0
-        } else {
-            0.0
-        };
-        let color = if cache_pct >= 50.0 {
-            GREEN
-        } else if cache_pct >= 20.0 {
-            YELLOW
-        } else {
-            SLATE600
-        };
-        let value = format!(
-            "{}{:.0}%{}{} hit{}",
-            color, cache_pct, RESET, SLATE600, RESET
-        );
-        columns.push(Column { label, value });
-    }
-
-    // "API Time"
-    if config.columns.contains(&"API Time".to_string()) {
-        let label = "API Time:".to_string();
-        let value = if stdin.total_api_duration_ms > 0 {
-            format!("{}{}{}", SLATE600, format_duration(stdin.total_api_duration_ms), RESET)
-        } else {
-            format!("{}N/A{}", SLATE600, RESET)
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "5h Reset"
-    if config.columns.contains(&"5h Reset".to_string()) {
-        let label = "5h Reset:".to_string();
-        let value = if let Some(u) = usage {
-            if let Some(resets) = u.five_hour_resets {
-                let rt = format_reset_time(resets);
-                if rt.is_empty() {
-                    format!("{}N/A{}", SLATE600, RESET)
+            Column { label, value }
+        })),
+        ("7d Usage", Box::new(|| {
+            let label = format!("{}7d Usage:{}", SLATE800_BOLD, RESET);
+            let value = if let Some(u) = usage {
+                let pct = u.seven_day;
+                let color = color_for_percent(pct, 60.0, 80.0);
+                let mut v = format!("{}{:.0}%{}", color, pct, RESET);
+                if let Some(resets) = u.seven_day_resets {
+                    let rt = format_reset_time(resets);
+                    if !rt.is_empty() {
+                        v.push_str(&format!(" {}{}{}", SLATE600, rt, RESET));
+                    }
+                }
+                v
+            } else {
+                format!("{}N/A{}", SLATE600, RESET)
+            };
+            Column { label, value }
+        })),
+        ("Context", Box::new(|| {
+            let label = format!("{}Context:{}", SLATE800_BOLD, RESET);
+            let pct = stdin.context_pct as f64;
+            let color = color_for_percent(pct, 70.0, 85.0);
+            let value = format!(
+                "{}{:.0}% {}{}Used{}",
+                color, pct, RESET, SLATE600, RESET
+            );
+            Column { label, value }
+        })),
+        ("Model", Box::new(|| {
+            let label = "Model:".to_string();
+            let value = format!("{}{}{}", SLATE600, stdin.model_id, RESET);
+            Column { label, value }
+        })),
+        ("Version", Box::new(|| {
+            let label = "Version:".to_string();
+            let value = if let Some(ref ver) = stdin.version {
+                let dot = match latest_version {
+                    None => format!("{}●{} ", GREEN, RESET),
+                    Some(lv) => {
+                        if ver == lv {
+                            format!("{}●{} ", GREEN, RESET)
+                        } else {
+                            format!("{}●{} ", YELLOW, RESET)
+                        }
+                    }
+                };
+                format!("{}{}v{}{}", dot, SLATE600, ver, RESET)
+            } else {
+                format!("{}N/A{}", SLATE600, RESET)
+            };
+            Column { label, value }
+        })),
+        ("Session", Box::new(|| {
+            let label = "Session:".to_string();
+            let value = if stdin.total_duration_ms > 0 {
+                format!("{}{}{}", SLATE600, format_duration(stdin.total_duration_ms), RESET)
+            } else {
+                format!("{}N/A{}", SLATE600, RESET)
+            };
+            Column { label, value }
+        })),
+        ("Changes", Box::new(|| {
+            let label = "Changes:".to_string();
+            let added = stdin.total_lines_added;
+            let removed = stdin.total_lines_removed;
+            let value = if added == 0 && removed == 0 {
+                format!("{}+0/-0{}", SLATE600, RESET)
+            } else {
+                format!(
+                    "{}+{}{}/{}{}{}",
+                    GREEN, added, RESET, RED, format!("-{}", removed), RESET
+                )
+            };
+            Column { label, value }
+        })),
+        ("Directory", Box::new(|| {
+            let label = "Directory:".to_string();
+            let value = match &stdin.current_dir {
+                Some(d) => format!("{}{}{}", SLATE600, d, RESET),
+                None => format!("{}N/A{}", SLATE600, RESET),
+            };
+            Column { label, value }
+        })),
+        ("Cost", Box::new(|| {
+            let label = "Cost:".to_string();
+            let cost = stdin.total_cost_usd;
+            let color = if cost >= 1.0 {
+                RED
+            } else if cost >= 0.25 {
+                YELLOW
+            } else {
+                GREEN
+            };
+            let value = format!("{}${:.2}{}", color, cost, RESET);
+            Column { label, value }
+        })),
+        ("Tokens", Box::new(|| {
+            let label = "Tokens:".to_string();
+            let total = stdin.input_tokens + stdin.cache_creation_tokens + stdin.cache_read_tokens;
+            let value = format!("{}{}{}", SLATE600, format_tokens(total), RESET);
+            Column { label, value }
+        })),
+        ("Output Tokens", Box::new(|| {
+            let label = "Out Tokens:".to_string();
+            let value = format!("{}{}{}", SLATE600, format_tokens(stdin.total_output_tokens), RESET);
+            Column { label, value }
+        })),
+        ("Cache", Box::new(|| {
+            let label = "Cache:".to_string();
+            let total_in = stdin.input_tokens + stdin.cache_creation_tokens + stdin.cache_read_tokens;
+            let cache_pct = if total_in > 0 {
+                (stdin.cache_read_tokens as f64 / total_in as f64) * 100.0
+            } else {
+                0.0
+            };
+            let color = if cache_pct >= 50.0 {
+                GREEN
+            } else if cache_pct >= 20.0 {
+                YELLOW
+            } else {
+                SLATE600
+            };
+            let value = format!(
+                "{}{:.0}%{}{} hit{}",
+                color, cache_pct, RESET, SLATE600, RESET
+            );
+            Column { label, value }
+        })),
+        ("API Time", Box::new(|| {
+            let label = "API Time:".to_string();
+            let value = if stdin.total_api_duration_ms > 0 {
+                format!("{}{}{}", SLATE600, format_duration(stdin.total_api_duration_ms), RESET)
+            } else {
+                format!("{}N/A{}", SLATE600, RESET)
+            };
+            Column { label, value }
+        })),
+        ("5h Reset", Box::new(|| {
+            let label = "5h Reset:".to_string();
+            let value = if let Some(u) = usage {
+                if let Some(resets) = u.five_hour_resets {
+                    let rt = format_reset_time(resets);
+                    if rt.is_empty() {
+                        format!("{}N/A{}", SLATE600, RESET)
+                    } else {
+                        format!("{}{}{}", SLATE600, rt, RESET)
+                    }
                 } else {
-                    format!("{}{}{}", SLATE600, rt, RESET)
+                    format!("{}N/A{}", SLATE600, RESET)
                 }
             } else {
                 format!("{}N/A{}", SLATE600, RESET)
-            }
-        } else {
-            format!("{}N/A{}", SLATE600, RESET)
-        };
-        columns.push(Column { label, value });
-    }
-
-    // "7d Reset"
-    if config.columns.contains(&"7d Reset".to_string()) {
-        let label = "7d Reset:".to_string();
-        let value = if let Some(u) = usage {
-            if let Some(resets) = u.seven_day_resets {
-                let rt = format_reset_time(resets);
-                if rt.is_empty() {
-                    format!("{}N/A{}", SLATE600, RESET)
+            };
+            Column { label, value }
+        })),
+        ("7d Reset", Box::new(|| {
+            let label = "7d Reset:".to_string();
+            let value = if let Some(u) = usage {
+                if let Some(resets) = u.seven_day_resets {
+                    let rt = format_reset_time(resets);
+                    if rt.is_empty() {
+                        format!("{}N/A{}", SLATE600, RESET)
+                    } else {
+                        format!("{}{}{}", SLATE600, rt, RESET)
+                    }
                 } else {
-                    format!("{}{}{}", SLATE600, rt, RESET)
+                    format!("{}N/A{}", SLATE600, RESET)
                 }
             } else {
                 format!("{}N/A{}", SLATE600, RESET)
-            }
-        } else {
-            format!("{}N/A{}", SLATE600, RESET)
-        };
-        columns.push(Column { label, value });
-    }
+            };
+            Column { label, value }
+        })),
+    ];
+
+    let columns: Vec<Column> = defs
+        .into_iter()
+        .filter(|(key, _)| config.columns.contains(&(*key).to_string()))
+        .map(|(_, builder)| builder())
+        .collect();
 
     // -----------------------------------------------------------------------
     // Layout rendering
@@ -428,6 +403,76 @@ mod tests {
         assert_eq!(truncate("hello", 10), "hello");
         assert_eq!(truncate("hello world", 5), "hello");
         assert_eq!(truncate("héllo wörld", 5), "héllo");
+    }
+
+    #[test]
+    fn test_render_all_columns_regression() {
+        let usage = UsageData {
+            five_hour: 42.0,
+            five_hour_resets: None,
+            seven_day: 15.0,
+            seven_day_resets: None,
+        };
+        let transcript = TranscriptData {
+            session_start: None,
+            agents: vec![],
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 30,
+            model_id: "Opus 4.6".to_string(),
+            version: Some("1.0.0".to_string()),
+            transcript_path: None,
+            total_cost_usd: 0.50,
+            total_duration_ms: 120000,
+            total_lines_added: 42,
+            total_lines_removed: 7,
+            total_api_duration_ms: 5000,
+            current_dir: Some("/home/user/project".to_string()),
+            agent_name: None,
+            input_tokens: 5000,
+            cache_creation_tokens: 1000,
+            cache_read_tokens: 3000,
+            total_output_tokens: 800,
+        };
+        let config = Config {
+            columns: vec![
+                "5h Usage".into(), "7d Usage".into(), "Context".into(),
+                "Model".into(), "Version".into(), "Session".into(),
+                "Changes".into(), "Directory".into(), "Cost".into(),
+                "Tokens".into(), "Output Tokens".into(), "Cache".into(),
+                "API Time".into(), "5h Reset".into(), "7d Reset".into(),
+            ],
+            layout: Layout::Vertical,
+        };
+        let out = render(Some(&usage), &transcript, &stdin_data, Some("1.0.0"), &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+
+        assert!(plain.contains("5h Usage:"), "missing 5h Usage");
+        assert!(plain.contains("42%"), "missing 5h value");
+        assert!(plain.contains("7d Usage:"), "missing 7d Usage");
+        assert!(plain.contains("15%"), "missing 7d value");
+        assert!(plain.contains("Context:"), "missing Context");
+        assert!(plain.contains("30%"), "missing context value");
+        assert!(plain.contains("Model:"), "missing Model");
+        assert!(plain.contains("Opus 4.6"), "missing model value");
+        assert!(plain.contains("Version:"), "missing Version");
+        assert!(plain.contains("v1.0.0"), "missing version value");
+        assert!(plain.contains("Session:"), "missing Session");
+        assert!(plain.contains("Changes:"), "missing Changes");
+        assert!(plain.contains("+42"), "missing added");
+        assert!(plain.contains("-7"), "missing removed");
+        assert!(plain.contains("Directory:"), "missing Directory");
+        assert!(plain.contains("/home/user/project"), "missing dir value");
+        assert!(plain.contains("Cost:"), "missing Cost");
+        assert!(plain.contains("$0.50"), "missing cost value");
+        assert!(plain.contains("Tokens:"), "missing Tokens");
+        assert!(plain.contains("Out Tokens:"), "missing Out Tokens");
+        assert!(plain.contains("Cache:"), "missing Cache");
+        assert!(plain.contains("API Time:"), "missing API Time");
+        assert!(plain.contains("5h Reset:"), "missing 5h Reset");
+        assert!(plain.contains("7d Reset:"), "missing 7d Reset");
     }
 
     #[test]
