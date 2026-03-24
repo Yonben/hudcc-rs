@@ -123,6 +123,8 @@ pub fn get_usage(debug_enabled: bool) -> Option<UsageData> {
         return None;
     }
 
+    debug_log_api(debug_enabled, &format!("raw API response: {}", body));
+
     let parsed = parse(&body).ok()?;
     let usage = build_usage_data(&parsed);
     let usage_json = usage_to_json(&usage);
@@ -410,7 +412,7 @@ pub fn build_usage_data(resp: &JsonValue) -> UsageData {
         .get("five_hour")
         .and_then(|v| v.get("utilization"))
         .and_then(|v| v.as_f64())
-        .map(|v| (v * 100.0).clamp(0.0, 100.0))
+        .map(|v| if v <= 1.0 { v * 100.0 } else { v }.clamp(0.0, 100.0))
         .unwrap_or(0.0);
 
     let five_hour_resets = resp
@@ -423,7 +425,7 @@ pub fn build_usage_data(resp: &JsonValue) -> UsageData {
         .get("seven_day")
         .and_then(|v| v.get("utilization"))
         .and_then(|v| v.as_f64())
-        .map(|v| (v * 100.0).clamp(0.0, 100.0))
+        .map(|v| if v <= 1.0 { v * 100.0 } else { v }.clamp(0.0, 100.0))
         .unwrap_or(0.0);
 
     let seven_day_resets = resp
@@ -591,6 +593,25 @@ mod tests {
         assert!(usage.seven_day_resets.is_some());
         // 2025-01-01T00:00:00Z = 1735689600000 ms
         assert_eq!(usage.five_hour_resets, Some(1735689600000));
+    }
+
+    #[test]
+    fn test_build_usage_data_percentage_format() {
+        let resp_json = r#"{
+            "five_hour": {
+                "utilization": 87.0,
+                "resets_at": "2025-01-01T00:00:00Z"
+            },
+            "seven_day": {
+                "utilization": 38.0,
+                "resets_at": "2025-01-08T00:00:00Z"
+            }
+        }"#;
+        let parsed = parse(resp_json).expect("valid json");
+        let usage = build_usage_data(&parsed);
+
+        assert!((usage.five_hour - 87.0).abs() < 1e-9);
+        assert!((usage.seven_day - 38.0).abs() < 1e-9);
     }
 
     #[test]
