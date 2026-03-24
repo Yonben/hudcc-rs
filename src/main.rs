@@ -29,7 +29,9 @@ fn main() {
 }
 
 fn run() {
-    let stdin_data = match stdin::read_stdin() {
+    let debug_enabled = std::env::var("HUD_DEBUG").as_deref() == Ok("1");
+
+    let stdin_data = match stdin::read_stdin(debug_enabled) {
         Some(d) => d,
         None => {
             println!("{}[HUD] waiting for data...{}", ansi::DIM, ansi::RESET);
@@ -37,9 +39,7 @@ fn run() {
         }
     };
 
-    let config = config::read_config();
-
-    let debug_enabled = std::env::var("HUD_DEBUG").as_deref() == Ok("1");
+    let config = config::read_config(debug_enabled);
 
     let no_network = std::env::var("HUD_NO_NETWORK")
         .ok()

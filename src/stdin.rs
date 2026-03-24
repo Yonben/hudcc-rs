@@ -1,6 +1,6 @@
 // Stdin JSON parser — reads the payload Claude Code pipes to the HUD binary.
 
-use crate::json::{parse, JsonValue};
+use crate::json::JsonValue;
 use std::io::Read;
 
 // ---------------------------------------------------------------------------
@@ -51,19 +51,32 @@ pub struct StdinData {
 
 /// Read all of stdin and parse as JSON.  Returns `None` when stdin is a TTY
 /// (i.e. no data is being piped) or when the input is empty / unparseable.
-pub fn read_stdin() -> Option<StdinData> {
+pub fn read_stdin(debug_enabled: bool) -> Option<StdinData> {
     if atty_stdin() {
         return None;
     }
 
     let mut buf = String::new();
-    std::io::stdin().read_to_string(&mut buf).ok()?;
+    if let Err(e) = std::io::stdin().read_to_string(&mut buf) {
+        if debug_enabled {
+            eprintln!("[hud] stdin: read error: {}", e);
+        }
+        return None;
+    }
     let trimmed = buf.trim();
     if trimmed.is_empty() {
         return None;
     }
 
-    let val = parse(trimmed).ok()?;
+    let val = match crate::json::parse(trimmed) {
+        Ok(v) => v,
+        Err(e) => {
+            if debug_enabled {
+                eprintln!("[hud] stdin: parse error: {}", e);
+            }
+            return None;
+        }
+    };
     Some(extract(&val))
 }
 

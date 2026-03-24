@@ -138,7 +138,7 @@ pub fn strip_jsonc(input: &str) -> String {
 
 /// Read `~/.claude/hud/config.jsonc`, parse it, and return a `Config`.
 /// Falls back to defaults on any error.
-pub fn read_config() -> Config {
+pub fn read_config(debug_enabled: bool) -> Config {
     let default_config = Config {
         columns: ALL_COLUMNS
             .iter()
@@ -164,7 +164,12 @@ pub fn read_config() -> Config {
 
     let parsed = match json::parse(&stripped) {
         Ok(v) => v,
-        Err(_) => return default_config,
+        Err(e) => {
+            if debug_enabled {
+                eprintln!("[hud] config: parse error: {}", e);
+            }
+            return default_config;
+        }
     };
 
     // Extract layout
