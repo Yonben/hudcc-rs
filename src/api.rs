@@ -44,17 +44,7 @@ fn debug_log_api(debug_enabled: bool, msg: &str) {
     if !debug_enabled {
         return;
     }
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    let path = format!("{}/.claude/hud/.usage-debug.log", home);
-    // Ensure parent directory exists
-    if let Some(parent) = std::path::Path::new(&path).parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    let now = now_ms();
-    let entry = format!("[{}] {}\n", now, msg);
-    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&path) {
-        let _ = f.write_all(entry.as_bytes());
-    }
+    eprintln!("[hud] api: {}", msg);
 }
 
 // ---------------------------------------------------------------------------
