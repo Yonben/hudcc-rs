@@ -539,6 +539,30 @@ mod tests {
     }
 
     #[test]
+    fn test_deeply_nested() {
+        let mut json = String::new();
+        for _ in 0..15 {
+            json.push_str(r#"{"a":"#);
+        }
+        json.push_str("1");
+        for _ in 0..15 {
+            json.push('}');
+        }
+        let val = parse(&json).unwrap();
+        let keys = vec!["a"; 14];
+        let deepest = val.get_path(&keys).unwrap();
+        assert_eq!(deepest.get("a"), Some(&JsonValue::Number(1.0)));
+    }
+
+    #[test]
+    fn test_very_long_string() {
+        let long = "x".repeat(10_000);
+        let json = format!(r#""{}""#, long);
+        let val = parse(&json).unwrap();
+        assert_eq!(val.as_str().unwrap().len(), 10_000);
+    }
+
+    #[test]
     fn test_unicode_escape() {
         // \u0041 is 'A'
         let v = parse(r#""\u0041""#).unwrap();

@@ -636,6 +636,41 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_columns_config() {
+        let transcript = TranscriptData {
+            session_start: None,
+            agents: vec![],
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 50,
+            model_id: "Opus 4.6".to_string(),
+            version: None,
+            transcript_path: None,
+            total_cost_usd: 0.0,
+            total_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            total_api_duration_ms: 0,
+            current_dir: None,
+            agent_name: None,
+            input_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            total_output_tokens: 0,
+        };
+        let config = Config {
+            columns: vec![],
+            layout: Layout::Vertical,
+        };
+        let out = render(None, &transcript, &stdin_data, None, &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+        assert!(!plain.contains("Usage:"));
+        assert!(!plain.contains("Context:"));
+    }
+
+    #[test]
     fn test_long_directory_truncated() {
         let transcript = TranscriptData {
             session_start: None,

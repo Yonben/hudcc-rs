@@ -345,6 +345,29 @@ mod tests {
     }
 
     #[test]
+    fn test_missing_model_field() {
+        let json = r#"{"context_window": {"used_percentage": 50}}"#;
+        let val = parse(json).unwrap();
+        let data = extract(&val);
+        assert_eq!(data.model_id, "");
+    }
+
+    #[test]
+    fn test_missing_context_window() {
+        let json = r#"{"model": {"id": "claude-opus-4-6"}}"#;
+        let val = parse(json).unwrap();
+        let data = extract(&val);
+        assert_eq!(data.context_pct, 0);
+    }
+
+    #[test]
+    fn test_context_percent_clamped() {
+        let json = r#"{"context_window": {"used_percentage": 150.0}}"#;
+        let val = parse(json).unwrap();
+        assert_eq!(get_context_percent(&val), 100);
+    }
+
+    #[test]
     fn test_extract_full_stdin() {
         let json = r#"{
             "model": {

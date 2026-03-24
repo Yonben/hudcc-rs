@@ -492,6 +492,33 @@ mod tests {
     }
 
     #[test]
+    fn test_malformed_jsonl_skipped() {
+        let mut state = ParseState::new();
+        process_line(r#"{"timestamp":"2025-01-01T00:00:00Z","type":"assistant","content":[]}"#, &mut state);
+        process_line("this is not json {{{", &mut state);
+        process_line("", &mut state);
+        assert!(state.session_start.is_some());
+    }
+
+    #[test]
+    fn test_stale_agent_marked_completed() {
+        let old_time = now_ms().saturating_sub(STALE_AGENT_MS + 1000);
+        let mut state = ParseState::new();
+        state.agent_map.push(AgentEntry {
+            tool_use_id: "tu_stale".to_string(),
+            agent_id: None,
+            agent_type: "Task".to_string(),
+            model: None,
+            description: "old task".to_string(),
+            status: AgentStatus::Running,
+            start_time: old_time,
+        });
+        let result = build_result(state);
+        assert_eq!(result.agents.len(), 1);
+        assert_eq!(result.agents[0].status, AgentStatus::Completed);
+    }
+
+    #[test]
     fn test_empty_transcript() {
         let result = parse_transcript("/nonexistent/path/to/file.jsonl");
         assert!(result.session_start.is_none());
