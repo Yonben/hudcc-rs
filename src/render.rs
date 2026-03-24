@@ -101,7 +101,7 @@ pub fn render(
         })),
         ("Model", Box::new(|| {
             let label = "Model:".to_string();
-            let value = format!("{}{}{}", SLATE600, stdin.model_id, RESET);
+            let value = format!("{}{}{}", SLATE600, truncate(&stdin.model_id, 15), RESET);
             Column { label, value }
         })),
         ("Version", Box::new(|| {
@@ -149,7 +149,7 @@ pub fn render(
         ("Directory", Box::new(|| {
             let label = "Directory:".to_string();
             let value = match &stdin.current_dir {
-                Some(d) => format!("{}{}{}", SLATE600, d, RESET),
+                Some(d) => format!("{}{}{}", SLATE600, truncate(d, 20), RESET),
                 None => format!("{}N/A{}", SLATE600, RESET),
             };
             Column { label, value }
@@ -633,5 +633,43 @@ mod tests {
         let out = render(None, &transcript, &stdin_data, None, &config);
         let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
         assert!(plain.contains("<$0.01"), "sub-penny cost should show <$0.01, got: {}", plain);
+    }
+
+    #[test]
+    fn test_long_directory_truncated() {
+        let transcript = TranscriptData {
+            session_start: None,
+            agents: vec![],
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 30,
+            model_id: "Some Very Long Model Name Here".to_string(),
+            version: None,
+            transcript_path: None,
+            total_cost_usd: 0.0,
+            total_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            total_api_duration_ms: 0,
+            current_dir: Some("/home/user/very/long/nested/directory/path/here".to_string()),
+            agent_name: None,
+            input_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            total_output_tokens: 0,
+        };
+        let config = Config {
+            columns: vec!["Directory".into(), "Model".into()],
+            layout: Layout::Horizontal,
+        };
+        let out = render(None, &transcript, &stdin_data, None, &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+        assert!(plain.contains("…"), "should have ellipsis for truncation");
+        assert!(!plain.contains("/home/user/very/long/nested/directory/path/here"),
+            "full directory should not appear");
+        assert!(!plain.contains("Some Very Long Model Name Here"),
+            "full model name should not appear");
     }
 }
