@@ -171,7 +171,6 @@ fn download_and_replace(tag: &str) -> bool {
             return false;
         }
     };
-    let _ = output; // used above
 
     // Make executable
     #[cfg(unix)]

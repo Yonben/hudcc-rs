@@ -46,9 +46,10 @@ mkdir -p "${HOME}/.claude/hud"
 
 # Download
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${ASSET}"
-HTTP_CODE="$(curl -fsSL -w '%{http_code}' -o "${HOME}/.claude/hud/hudcc_rs" "${DOWNLOAD_URL}")"
+HTTP_CODE="$(curl -sSL -w '%{http_code}' -o "${HOME}/.claude/hud/hudcc_rs" "${DOWNLOAD_URL}")"
 
 if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+    rm -f "${HOME}/.claude/hud/hudcc_rs"
     echo "Error: Download failed with HTTP ${HTTP_CODE}" >&2
     exit 1
 fi
