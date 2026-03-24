@@ -91,6 +91,7 @@ fn test_full_pipeline_all_columns() {
         &transcript,
         &stdin,
         Some("1.0.31"),
+        None,
         &config,
     );
     let text = plain(&output);
@@ -123,6 +124,7 @@ fn test_full_pipeline_no_usage() {
         &transcript,
         &stdin,
         None,
+        None,
         &config,
     );
     let text = plain(&output);
@@ -140,6 +142,7 @@ fn test_vertical_layout_has_two_rows() {
         None,
         &transcript,
         &stdin,
+        None,
         None,
         &config,
     );
@@ -167,6 +170,7 @@ fn test_horizontal_layout_single_row() {
         None,
         &transcript,
         &stdin,
+        None,
         None,
         &config,
     );

@@ -45,6 +45,7 @@ pub fn render(
     transcript: &TranscriptData,
     stdin: &StdinData,
     latest_version: Option<&str>,
+    update_status: Option<&crate::update::UpdateStatus>,
     config: &Config,
 ) -> String {
     // -----------------------------------------------------------------------
@@ -338,6 +339,23 @@ pub fn render(
         ));
     }
 
+    // HUD update status
+    match update_status {
+        Some(crate::update::UpdateStatus::Updated(v)) => {
+            line3_parts.push(format!(
+                "{}HUD:{} {}✓ updated to v{}{}",
+                SLATE800_BOLD, RESET, GREEN, v, RESET
+            ));
+        }
+        Some(crate::update::UpdateStatus::Available(v)) => {
+            line3_parts.push(format!(
+                "{}HUD:{} {}⬆ v{}{}",
+                SLATE800_BOLD, RESET, YELLOW, v, RESET
+            ));
+        }
+        None => {}
+    }
+
     let sep_colored = format!(" {}│{} ", SLATE800, RESET);
 
     let mut output = main_section;
@@ -476,7 +494,7 @@ mod tests {
             ],
             layout: Layout::Vertical,
         };
-        let out = render(Some(&usage), &transcript, &stdin_data, Some("1.0.0"), &config);
+        let out = render(Some(&usage), &transcript, &stdin_data, Some("1.0.0"), None, &config);
         let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
 
         assert!(plain.contains("5h Usage:"), "missing 5h Usage");
@@ -540,7 +558,7 @@ mod tests {
             columns: vec!["5h Usage".into(), "Context".into(), "Model".into()],
             layout: Layout::Vertical,
         };
-        let out = render(Some(&usage), &transcript, &stdin_data, None, &config);
+        let out = render(Some(&usage), &transcript, &stdin_data, None, None, &config);
         let plain = ansi::strip_ansi(&out).replace('\u{00A0}', " ");
         assert!(plain.contains("5h Usage:"));
         assert!(plain.contains("42%"));
@@ -595,7 +613,7 @@ mod tests {
             columns: vec!["5h Usage".into()],
             layout: Layout::Vertical,
         };
-        let out = render(Some(&usage), &transcript, &stdin_data, None, &config);
+        let out = render(Some(&usage), &transcript, &stdin_data, None, None, &config);
         let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
         assert!(plain.contains("and 3 more"), "missing overflow indicator, got:\n{}", plain);
         assert!(!plain.contains("Agent task 4"), "agent 4 should be hidden");
@@ -630,7 +648,7 @@ mod tests {
             columns: vec!["Cost".into()],
             layout: Layout::Horizontal,
         };
-        let out = render(None, &transcript, &stdin_data, None, &config);
+        let out = render(None, &transcript, &stdin_data, None, None, &config);
         let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
         assert!(plain.contains("<$0.01"), "sub-penny cost should show <$0.01, got: {}", plain);
     }
@@ -664,7 +682,7 @@ mod tests {
             columns: vec![],
             layout: Layout::Vertical,
         };
-        let out = render(None, &transcript, &stdin_data, None, &config);
+        let out = render(None, &transcript, &stdin_data, None, None, &config);
         let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
         assert!(!plain.contains("Usage:"));
         assert!(!plain.contains("Context:"));
@@ -699,12 +717,117 @@ mod tests {
             columns: vec!["Directory".into(), "Model".into()],
             layout: Layout::Horizontal,
         };
-        let out = render(None, &transcript, &stdin_data, None, &config);
+        let out = render(None, &transcript, &stdin_data, None, None, &config);
         let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
         assert!(plain.contains("…"), "should have ellipsis for truncation");
         assert!(!plain.contains("/home/user/very/long/nested/directory/path/here"),
             "full directory should not appear");
         assert!(!plain.contains("Some Very Long Model Name Here"),
             "full model name should not appear");
+    }
+
+    #[test]
+    fn test_render_hud_update_available() {
+        let transcript = TranscriptData {
+            session_start: None,
+            agents: vec![],
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 30,
+            model_id: "Opus 4.6".to_string(),
+            version: None,
+            transcript_path: None,
+            total_cost_usd: 0.0,
+            total_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            total_api_duration_ms: 0,
+            current_dir: None,
+            agent_name: None,
+            input_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            total_output_tokens: 0,
+        };
+        let config = Config {
+            columns: vec!["5h Usage".into()],
+            layout: Layout::Vertical,
+        };
+        let update = crate::update::UpdateStatus::Available("0.2.0".to_string());
+        let out = render(None, &transcript, &stdin_data, None, Some(&update), &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+        assert!(plain.contains("HUD:"), "should show HUD label");
+        assert!(plain.contains("v0.2.0"), "should show version");
+    }
+
+    #[test]
+    fn test_render_hud_updated() {
+        let transcript = TranscriptData {
+            session_start: None,
+            agents: vec![],
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 30,
+            model_id: "Opus 4.6".to_string(),
+            version: None,
+            transcript_path: None,
+            total_cost_usd: 0.0,
+            total_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            total_api_duration_ms: 0,
+            current_dir: None,
+            agent_name: None,
+            input_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            total_output_tokens: 0,
+        };
+        let config = Config {
+            columns: vec!["5h Usage".into()],
+            layout: Layout::Vertical,
+        };
+        let update = crate::update::UpdateStatus::Updated("0.2.0".to_string());
+        let out = render(None, &transcript, &stdin_data, None, Some(&update), &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+        assert!(plain.contains("updated to v0.2.0"), "should show updated message");
+    }
+
+    #[test]
+    fn test_render_no_update_no_hud_column() {
+        let transcript = TranscriptData {
+            session_start: None,
+            agents: vec![],
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 30,
+            model_id: "Opus 4.6".to_string(),
+            version: None,
+            transcript_path: None,
+            total_cost_usd: 0.0,
+            total_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            total_api_duration_ms: 0,
+            current_dir: None,
+            agent_name: None,
+            input_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            total_output_tokens: 0,
+        };
+        let config = Config {
+            columns: vec!["5h Usage".into()],
+            layout: Layout::Vertical,
+        };
+        let out = render(None, &transcript, &stdin_data, None, None, &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+        assert!(!plain.contains("HUD:"), "should not show HUD when no update");
     }
 }

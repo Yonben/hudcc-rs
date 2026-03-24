@@ -55,6 +55,10 @@ fn run() {
         if no_network { None } else { version::get_latest_version() }
     });
 
+    let update_handle = thread::spawn(move || {
+        if no_network { None } else { update::check_for_update() }
+    });
+
     let usage = match usage_handle.join() {
         Ok(v) => v,
         Err(e) => {
@@ -107,12 +111,29 @@ fn run() {
             None
         }
     };
+    let update_status = match update_handle.join() {
+        Ok(v) => v,
+        Err(e) => {
+            if debug_enabled {
+                let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                    s.to_string()
+                } else if let Some(s) = e.downcast_ref::<String>() {
+                    s.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                eprintln!("[hud] update thread panicked: {}", msg);
+            }
+            None
+        }
+    };
 
     let output = render::render(
         usage.as_ref(),
         &transcript_data,
         &stdin_data,
         latest_version.as_deref(),
+        update_status.as_ref(),
         &config,
     );
 
