@@ -351,13 +351,21 @@ pub fn render(
     // -----------------------------------------------------------------------
     if running_count > 0 {
         let now = now_ms();
+        let overflow = running_count > 5;
+        let take_count = if overflow { 4 } else { 5 };
         let display_agents: Vec<&&crate::transcript::Agent> = running_agents.iter()
-            .take(5)
+            .take(take_count)
             .collect();
         let last_idx = display_agents.len().saturating_sub(1);
 
         for (i, agent) in display_agents.iter().enumerate() {
-            let prefix = if i == last_idx { "└─" } else { "├─" };
+            let prefix = if overflow {
+                "├─"
+            } else if i == last_idx {
+                "└─"
+            } else {
+                "├─"
+            };
             let type_trunc = truncate(&agent.agent_type, 14);
             let model_label = match agent.model.as_deref() {
                 Some(m) if m.to_lowercase().contains("opus") => {
@@ -382,6 +390,14 @@ pub fn render(
                 SLATE600, elapsed_padded, RESET,
                 "  ",
                 SLATE600, desc_trunc, RESET
+            ));
+        }
+
+        if overflow {
+            output.push('\n');
+            output.push_str(&format!(
+                "{}{}└─{} {}… and {} more{}",
+                RESET, SLATE800, RESET, SLATE600, running_count - 4, RESET
             ));
         }
     }
@@ -528,5 +544,56 @@ mod tests {
         assert!(plain.contains("30%"));
         assert!(plain.contains("Model:"));
         assert!(plain.contains("Opus 4.6"));
+    }
+
+    #[test]
+    fn test_agent_overflow_indicator() {
+        let usage = UsageData {
+            five_hour: 10.0,
+            five_hour_resets: None,
+            seven_day: 5.0,
+            seven_day_resets: None,
+        };
+        let agents: Vec<crate::transcript::Agent> = (0..7).map(|i| {
+            crate::transcript::Agent {
+                id: format!("agent_{}", i),
+                agent_type: "Task".to_string(),
+                model: Some("claude-sonnet-4-5".to_string()),
+                description: format!("Agent task {}", i),
+                status: AgentStatus::Running,
+                start_time: crate::time::now_ms(),
+            }
+        }).collect();
+        let transcript = TranscriptData {
+            session_start: None,
+            agents,
+            todos: vec![],
+        };
+        let stdin_data = StdinData {
+            raw: crate::json::JsonValue::Null,
+            context_pct: 30,
+            model_id: "Opus 4.6".to_string(),
+            version: Some("1.0.0".to_string()),
+            transcript_path: None,
+            total_cost_usd: 0.0,
+            total_duration_ms: 0,
+            total_lines_added: 0,
+            total_lines_removed: 0,
+            total_api_duration_ms: 0,
+            current_dir: None,
+            agent_name: None,
+            input_tokens: 0,
+            cache_creation_tokens: 0,
+            cache_read_tokens: 0,
+            total_output_tokens: 0,
+        };
+        let config = Config {
+            columns: vec!["5h Usage".into()],
+            layout: Layout::Vertical,
+        };
+        let out = render(Some(&usage), &transcript, &stdin_data, None, &config);
+        let plain = crate::ansi::strip_ansi(&out).replace('\u{00A0}', " ");
+        assert!(plain.contains("and 3 more"), "missing overflow indicator, got:\n{}", plain);
+        assert!(!plain.contains("Agent task 4"), "agent 4 should be hidden");
     }
 }
