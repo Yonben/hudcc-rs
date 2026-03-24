@@ -8,3 +8,4 @@ pub mod api;
 pub mod version;
 pub mod transcript;
 pub mod render;
+pub mod update;
